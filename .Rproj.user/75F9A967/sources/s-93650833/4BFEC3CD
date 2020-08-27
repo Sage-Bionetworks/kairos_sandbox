@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1598479748459.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2968253330",
+    "id" : "4BFEC3CD",
+    "lastKnownWriteTime" : 1598479781,
+    "last_content_update" : 1598479781280,
+    "path" : "~/git/gitrepo/kairos_sandbox/content/project/internal-project/internal_proj_test.Rmd",
+    "project_path" : "content/project/internal-project/internal_proj_test.Rmd",
+    "properties" : {
+        "cursorPosition" : "1,0",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

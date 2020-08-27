@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1598479873369.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2626209761",
+    "id" : "5CF3786F",
+    "lastKnownWriteTime" : 1598481416,
+    "last_content_update" : 1598481416067,
+    "path" : "~/git/gitrepo/kairos_sandbox/content/project/internal-project/clustering_phenotypes.md",
+    "project_path" : "content/project/internal-project/clustering_phenotypes.md",
+    "properties" : {
+        "cursorPosition" : "25,60",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "markdown"
+}

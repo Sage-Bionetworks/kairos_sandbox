@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1598480350256.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "87ACADE9",
+    "lastKnownWriteTime" : 1598480613,
+    "last_content_update" : 1598480613,
+    "path" : "~/git/gitrepo/kairos_sandbox/content/authors/admin/RobertAllaway_index.md",
+    "project_path" : "content/authors/admin/RobertAllaway_index.md",
+    "properties" : {
+        "cursorPosition" : "6,20",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "markdown"
+}

@@ -1,0 +1,464 @@
+---
+title: "GSVA on publicly available data from NF primary tissue"
+author: "Jineta Banerjee"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    df_print: paged
+    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Scope
+ This document contains a preliminary application of Gene Set Variation Analysis on RNA seq data available from NTAP funded investigations. Many of the investigations are private and have access restrictions. So this preliminary work will focus on the datasets that have public access and were recently published in the [Genes paper](https://www.mdpi.com/2073-4425/11/2/226/html).
+ 
+ 
+```{r lib_synapser, echo=FALSE, eval=TRUE, results='hide', message=FALSE, warning=FALSE}
+
+library(synapser)
+library(BiocManager)
+library(gProfileR)
+library(GOsummaries)
+library(tidyverse)
+library(ggfortify)
+library(GSVA)
+library(GSVAdata)
+library(biomartr)
+library(pheatmap)
+library(biomaRt)
+library(glue)
+library(edgeR)
+library(limma)
+
+library(synapser)
+synapser::synLogin()
+
+## Make colors for plots
+library(RColorBrewer)
+library(wesanderson)
+#fabcolors = RColorBrewer::brewer.pal(n = 11,name = 'RdGy')
+col2 = RColorBrewer::brewer.pal(n = 10,name = 'PRGn')
+col1 = RColorBrewer::brewer.pal(n = 10,name = 'Spectral')
+col3 = RColorBrewer::brewer.pal(n = 10,name = 'BrBG')
+col4 = RColorBrewer::brewer.pal(n = 10,name = 'PiYG')
+col5 = RColorBrewer::brewer.pal(n = 10,name = 'PuOr')
+col6 = RColorBrewer::brewer.pal(n = 10,name = 'RdBu')
+
+allcolors <- c(col1,col2,col3, col4, col5, col6)
+allcolors <- list(allcolors)
+
+morecolors1 <- wes_palette("Darjeeling1", n=4, type = "discrete")
+morecolors1 <- list(morecolors1)
+
+morecolors2 <- wes_palette("Moonrise2", n=3, type = "discrete")
+morecolors2 <- list(morecolors2)
+
+cooler <- list(c("#413144", "#B185A7", "#D37D72", "#A9A090", "#FFCE9E", 
+                 "#f6511d", "#ffb400", "#00a6ed", "#7fb800", "#0d2c54",
+                 "#6da34d", "#56445d", "#548687", "#8fbc94", "#c5e99b",
+                 "#d36135", "#7fb069", "#ece4b7", "#e6aa68", "#02020b",
+                 "#ca054d", "#3b1c32", "#a4d4b4", "#ffcf9c", "#b96d40",
+                 "#adbca5", "#e8b9ab", "#e09891", "#cb769e", "#8c5f66",
+                 "#795c5f", "#a69658", "#d9b26f", "#fadf7f", "#f2e29f"))
+
+color_list <- c(allcolors, morecolors1, morecolors2, cooler)
+
+```
+
+```{r colorlist, echo=TRUE, eval=TRUE,results='hide', message=FALSE, warning=FALSE}
+
+## Make colors for plots
+library(RColorBrewer)
+library(wesanderson)
+#fabcolors = RColorBrewer::brewer.pal(n = 11,name = 'RdGy')
+col2 = RColorBrewer::brewer.pal(n = 10,name = 'PRGn')
+col1 = RColorBrewer::brewer.pal(n = 10,name = 'Spectral')
+col3 = RColorBrewer::brewer.pal(n = 10,name = 'BrBG')
+col4 = RColorBrewer::brewer.pal(n = 10,name = 'PiYG')
+col5 = RColorBrewer::brewer.pal(n = 10,name = 'PuOr')
+col6 = RColorBrewer::brewer.pal(n = 10,name = 'RdBu')
+
+allcolors <- c(col1,col2,col3, col4, col5, col6)
+allcolors <- list(allcolors)
+
+morecolors1 <- wes_palette("Darjeeling1", n=4, type = "discrete")
+morecolors1 <- list(morecolors1)
+
+morecolors2 <- wes_palette("Moonrise2", n=3, type = "discrete")
+morecolors2 <- list(morecolors2)
+
+cooler <- list(c("#413144", "#B185A7", "#D37D72", "#A9A090", "#FFCE9E", 
+                 "#f6511d", "#ffb400", "#00a6ed", "#7fb800", "#0d2c54",
+                 "#6da34d", "#56445d", "#548687", "#8fbc94", "#c5e99b",
+                 "#d36135", "#7fb069", "#ece4b7", "#e6aa68", "#02020b",
+                 "#ca054d", "#3b1c32", "#a4d4b4", "#ffcf9c", "#b96d40",
+                 "#adbca5", "#e8b9ab", "#e09891", "#cb769e", "#8c5f66",
+                 "#795c5f", "#a69658", "#d9b26f", "#fadf7f", "#f2e29f"))
+
+color_list <- c(allcolors, morecolors1, morecolors2, cooler)
+
+
+```
+
+```{r get_data_from_synapse, echo=TRUE, eval=TRUE,results='hide', message=FALSE, warning=FALSE}
+
+#### Download the portal files
+files <- synapser::synTableQuery("SELECT * FROM syn16858331")$asDataFrame()
+
+```
+
+#### Accessing data
+
+Examples of NTAP studies that have files under access restrictions are below:
+
+```{r data_filtering, echo=TRUE, eval=TRUE, results='show', message=FALSE, warning=FALSE}
+
+#### All NTAP rnaSeq files
+
+NTAP_files <- files %>% 
+  dplyr::filter(fundingAgency == "NTAP") %>% 
+  dplyr::filter(assay == "rnaSeq") %>% 
+  dplyr::select(id, studyId, projectId, studyName, accessType)
+
+# private_files <- NTAP_files %>% 
+#   filter(accessType == "PRIVATE") %>% 
+#   dplyr::select(c(studyName, id))
+# 
+# #print("Studies that may contain private or protected data")
+# #DT::datatable(private_files)
+# unique(private_files$studyName)
+
+request_files <- NTAP_files %>% 
+  filter(accessType %in% c("REQUEST ACCESS", "PRIVATE")) %>% 
+  dplyr::select(c(studyName, id))
+
+#DT::datatable(request_files)
+unique(request_files$studyName)
+
+```
+
+Since many of the NTAP studies need access permissions, the first pass of this analysis was done on data that has already been made public in the Genes paper. Additionally only tumor tissue data was selected for the following analysis.
+
+```{r published data, echo=TRUE, eval=TRUE, results='hide', message=FALSE, warning=FALSE}
+
+#### Only published files
+
+NTAP_published_files <- synapser::synTableQuery(glue::glue("SELECT * FROM syn21221980"))$asDataFrame()
+
+data1 <- synapser::synTableQuery(glue::glue("SELECT * FROM {NTAP_published_files$tableId[1]}"))$asDataFrame() %>% 
+  dplyr::select(totalCounts, Symbol, zScore, specimenID, individualID, sex, tumorType, studyName)
+
+data2 <- synapser::synTableQuery(glue::glue("SELECT * FROM {NTAP_published_files$tableId[2]}"))$asDataFrame() %>% 
+  dplyr::select(totalCounts, Symbol, zScore, specimenID, individualID, sex, tumorType, studyName)
+
+data3 <- synapser::synTableQuery(glue::glue("SELECT * FROM {NTAP_published_files$tableId[3]}"))$asDataFrame() %>% 
+  dplyr::select(totalCounts, Symbol, zScore, specimenID, individualID, sex, tumorType, studyName)
+
+data4 <- synapser::synTableQuery(glue::glue("SELECT * FROM {NTAP_published_files$tableId[4]}"))$asDataFrame() %>% 
+  dplyr::select(totalCounts, Symbol, zScore, specimenID, individualID, sex, tumorType, studyName)
+
+
+NTAP_pub_rnaseq_data <- rbind(data1,data2,data3,data4)
+
+NTAP_pub_rnaseq_data$sex[NTAP_pub_rnaseq_data$sex == "female"] <- "Female"
+NTAP_pub_rnaseq_data$sex[NTAP_pub_rnaseq_data$sex == "male"] <- "Male"
+NTAP_pub_rnaseq_data$tumorType[NTAP_pub_rnaseq_data$tumorType == "Malignant peripheral nerve sheath tumor"] <- "Malignant Peripheral Nerve Sheath Tumor"
+
+NTAP_pub_rnaseq_data <- NTAP_pub_rnaseq_data %>% 
+  filter(tumorType %in% c("Cutaneous Neurofibroma", "Plexiform Neurofibroma", "Neurofibroma", "Malignant Peripheral Nerve Sheath Tumor"),
+         !grepl('xenograft', specimenID, ignore.case = T),
+         !grepl('Cell Line', specimenID, ignore.case = T),
+         !specimenID %in% c("BI386-004","CW225-001","DW356-002",
+                            "JK368-003", "SK436-005"))
+
+```
+
+
+# Data Analysis
+
+#### Dimensionality Reduction
+
+To explore the data and find meaningful differences between samples, we first perform dimensionality reduction using principal component analysis. 
+
+```{r PCA, echo=T, eval=TRUE, results='hide', message=FALSE, warning=FALSE}
+
+###PCA plots  
+#genes.with.meta$specimenID <- as.factor(genes.with.meta$specimenID)
+
+doPcaPlots<-function(datafile, env){
+  #create matrix
+  combined.mat=reshape2::acast(datafile,
+                               Symbol~specimenID,
+                               value.var="zScore", 
+                               fun.aggregate = mean)
+  
+  #then remove missing
+  missing=which(apply(combined.mat,1,function(x) any(is.na(x))))
+  combined.mat=combined.mat[-missing,]
+  
+  ###PCA 
+  library(ggfortify)
+  pca_res <- prcomp(t(combined.mat),scale=TRUE) 
+  var_explained <- pca_res$sdev^2/sum(pca_res$sdev^2)
+  results <- as.data.frame(pca_res$x)
+  results$specimenID <- rownames(results)
+  
+  anno <- datafile %>% 
+    dplyr::select("specimenID", "tumorType", "studyName")
+  
+  plot_data <- merge(results, anno)
+
+  env$tab <- plot_data %>% 
+     ggplot(aes(x=PC1,
+               y=PC2)) + 
+    geom_point(aes(colour = as.factor(studyName), shape = as.factor(tumorType)), size=2) +
+    theme_bw() + 
+  labs(x=paste0("PC1: ",round(var_explained[1]*100,1),"%"),
+       y=paste0("PC2: ",round(var_explained[2]*100,1),"%")) +
+  theme(legend.position="right")
+  
+  
+
+  ###Look at genes contributing to PCs
+  loads=pca_res$x
+  
+  genes1=rownames(combined.mat)[rev(order(loads[,1]))[1:25]]
+  #now take those loadings from pc1
+  env$tab1 <- ggplot(subset(datafile,Symbol%in%genes1[1:5]))+
+                    geom_jitter(aes(x=Symbol,
+                                    y=zScore,
+                                    col=as.factor(tumorType),
+                                    shape=studyName), 
+                                width =0.1, 
+                                size=2, 
+                                height = 0.1)+
+                    ggtitle('Selected gene counts from PC1')
+
+  genes2=rownames(combined.mat)[rev(order(loads[,2]))[1:25]]
+  #now take those loadings from pc2
+  env$tab2 <- ggplot(subset(datafile,Symbol%in%genes2[1:5]))+
+              geom_jitter(aes(x=Symbol,
+                              y=zScore,
+                              col=tumorType,
+                              shape=studyName), 
+                          width =0.1, size=2, height = 0.1)+
+              ggtitle('Selected gene counts from PC2')
+}
+
+# myEnv <- new.env()
+# doPcaPlots(NTAP_pub_rnaseq_data, myEnv)
+# myEnv$tab
+# myEnv$tab1
+# myEnv$tab2
+
+myEnv <- new.env()
+doPcaPlots(NTAP_pub_rnaseq_data, myEnv)
+myEnv$tab
+# myEnv$tab1
+# myEnv$tab2
+
+
+```
+
+The PCA shows that the dataset seems to have two distinct clusters that are related to the centers of origin for the datasets. Since the CBTTC dataset seggregates from all the other datasets, we decided to exclude the dataset from the analysis hereafter.
+
+&nbsp;
+
+
+#### Pathway Analysis
+
+Generally disease conditions can change a _group of genes_ ( _gene-sets_ ) simultaneously, thus affecting one or more cellular signaling pathways and gene regulatory networks. Gene set enrichment (GSE) analysis condenses information from gene expression profiles into a pathway or signature summary. The strengths of this approach over single gene analysis include noise and dimension reduction, as well as greater biological interpretability. 
+
+Keeping in mind the technical differences that exist in the given samples and the lack of control samples, we implemented Gene Set Variation Analysis (GSVA) which is more efficient in detecting pathway variations across heterogeneous populations with complex phenotypic traits. GSVA calculates sample-wise gene set enrichment scores as a function of genes inside and outside the gene set. Furthermore, it estimates variation of gene set enrichment over the samples independently of any class label. 
+
+Our discussion suggested that there is an interest in identifying circulating factors that distinguish cNFs from other tumortypes. Thus in the heatmap below we have focused on visualizing the pathways enriched in given samples that relate to cytokines.
+
+```{r PathwayAnalysis, eval=TRUE, results='hide', message=FALSE, warning=FALSE, fig.height=10, fig.width=30}
+
+mat <- NTAP_pub_rnaseq_data %>% 
+  dplyr::filter(studyName != "Childrens Brain Tumor Tissue Consortium")
+
+gene_mat<-reshape2::acast(mat,
+                          Symbol~specimenID,
+                          value.var='zScore',
+                          fun.aggregate = mean)
+
+missing<-which(apply(gene_mat,1,function(x) any(is.na(x))))
+gene_mat<-gene_mat[-missing,]
+
+data("c2BroadSets")
+  
+#get mapping from enst to hgnc
+library(org.Hs.eg.db)
+library(hgu95a.db) #human
+
+gene_map<-AnnotationDbi::select(org.Hs.eg.db,  #using human db since its all primary tumor data
+                           columns=c("ENSEMBL", "SYMBOL", "ENTREZID"),
+                           keys=keys(org.Hs.eg.db, keytype = "SYMBOL"),
+                           keytype="SYMBOL",
+                           multiVals=unique(rownames(gene_mat)))
+  
+entrez<-gene_map$ENTREZID[match(rownames(gene_mat),gene_map$SYMBOL)]
+gene_mat<-gene_mat[which(!is.na(entrez)),]
+rownames(gene_mat)<-entrez[!is.na(entrez)]
+
+
+# override parallel::detectCores in case it fails to prevent gsva from failing
+requireNamespace('parallel')
+if (is.na(parallel::detectCores())) {
+  my.detectCores = function() {
+    return(1)
+  }
+  assignInNamespace("detectCores", 
+                    my.detectCores, 
+                    ns="parallel", 
+                    envir=as.environment("package:parallel"))
+}
+
+res=gsva(gene_mat,
+         method='gsva',
+         #method='ssgsea',
+         gset.idx.list=c2BroadSets)
+
+vars<-apply(res,1,var)
+
+annotes=NTAP_pub_rnaseq_data %>%
+  unique() %>% 
+  dplyr::select(specimenID,studyName,sex,tumorType) %>%
+  unique()
+
+annotes$tumorType <- as.factor(annotes$tumorType)
+annotes$sex <-as.factor(annotes$sex)
+
+rownames(annotes)<-annotes$specimenID
+
+ann_colors <- list(
+    sex = c("Male" = color_list[[4]][1], 
+            "Female" = color_list[[4]][4]),
+    tumorType = c("Cutaneous Neurofibroma" = color_list[[2]][1],
+                  "Plexiform Neurofibroma" = color_list[[2]][2],
+                  "Neurofibroma" = color_list[[2]][3],
+                  "Malignant Peripheral Nerve Sheath Tumor" = color_list[[2]][4]),
+    studyName = c("Preclinical NF1-MPNST Platform Development" = color_list[[1]][5],
+                  "A Nerve Sheath Tumor Bank from Patients with NF1" = color_list[[1]][12],
+                  "Cutaneous Neurofibroma Data Resource" = color_list[[1]][14]))
+
+final_data <- res %>% 
+  as.data.frame() %>% 
+  dplyr::filter(rownames(res) %in% c("KEGG_CYTOKINE_CYTOKINE_RECEPTOR_INTERACTION", "KEGG_ADIPOCYTOKINE_SIGNALING_PATHWAY", "BIOCARTA_CYTOKINE_PATHWAY", "REACTOME_TRAF6_MEDIATED_INDUCTION_OF_THE_ANTIVIRAL_CYTOKINE_IFN_ALPHA_BETA_CASCADE", "SA_MMP_CYTOKINE_CONNECTION")) 
+
+library(stringr)
+rownames(final_data) <- stringr::str_wrap(rownames(final_data), width = 30)
+
+
+pheatmap(final_data,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(100),
+         #kmeans_k = 4,
+         labels_col=rep("",(ncol(final_data)-1)),
+         fontsize_row = 16,
+         cluster_rows = T,
+         clustering_method = 'complete',
+         annotation_col = dplyr::select(annotes, -specimenID), 
+         annotation_colors = ann_colors,
+         width = 30, 
+         height = 30)
+
+library(heatmaply)
+heatmaply::heatmaply(final_data,
+                         dendrogram = "column",
+                         distfun = dist,
+                         hclustfun = hclust,
+                         dist_method = "euclidean",
+                         hclust_method = "complete",
+                         ColSideColors= ann_colors$tumorType,
+                         heatmap_layers = theme(axis.line=element_blank()),
+                         #margins = c(10,10,10,10),
+                         plot_method = "plotly") %>% 
+      plotly::layout(width = 1500, height = 800)
+
+```
+
+The pathways identified above are broad umbrella terms consisting of various different genes. A closer look at the components of these pathways can help identify testable target genes.
+
+&nbsp;
+
+The full list of all pathways enriched in the given samples are listed in the table below:
+```{r, eval=TRUE}
+
+#print(" Full list of the GSVA results : ") 
+DT::datatable(res)
+
+```
+&nbsp;
+
+#### Visualize genes in few enriched pathways
+
+```{r boxplot_biocarta, echo=FALSE, eval= TRUE, results='show', message=FALSE, warning=FALSE, fig.height=20, fig.width=20}
+
+biocarta <- read_csv("biocarta_cyt.csv") %>% 
+  as.data.frame()
+
+plot_data <- NTAP_pub_rnaseq_data %>% 
+  dplyr::filter(specimenID %in% colnames(res)) %>% 
+  dplyr::select(tumorType, Symbol, zScore)
+
+plot_data %>% 
+  dplyr::filter(Symbol %in% biocarta$genes[1:10]) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Symbol,y=zScore, col=tumorType))+
+  geom_point(aes(x=Symbol,y=zScore, col=tumorType), size = 2, alpha = 0.4)+
+  ggtitle('Genes constituting the Biocarta Cytokine Pathway') +
+  theme_bw()+
+  theme(legend.text = element_text(size=20), #element_text(size=8),
+              axis.text.x  = element_text(size=30, angle = 45),
+              axis.text.y = element_text(size=30),
+              text = element_text(size=30),
+              strip.text.x = element_text(size = 30),
+              legend.position="right",
+              panel.grid = element_blank(),
+              panel.background = element_rect(fill = "white")) 
+
+
+```
+
+&nbsp;
+
+```{r boxplot_kegg, echo=FALSE, eval= TRUE, results='show', message=FALSE, warning=FALSE, fig.height=20, fig.width=20}
+
+kegg <- read_csv("kegg_cyt.csv") %>% 
+  as.data.frame()
+
+plot_data %>% 
+  dplyr::filter(Symbol %in% as.vector(kegg$genes[1:10])) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Symbol,y=zScore, col=tumorType))+
+  geom_point(aes(x=Symbol,y=zScore, col=tumorType), size = 2, alpha = 0.4)+
+  ggtitle('Genes constituting the KEGG Cytokine-Cytokine Receptor Pathway') +
+  theme_bw()+
+  theme(legend.text = element_text(size=20), #element_text(size=8),
+              axis.text.x  = element_text(size=30, angle = 45),
+              axis.text.y = element_text(size=30),
+              text = element_text(size=30),
+              strip.text.x = element_text(size = 30),
+              legend.position="right",
+              panel.grid = element_blank(),
+              panel.background = element_rect(fill = "white")) 
+
+```
+
+&nbsp;
+
+
+

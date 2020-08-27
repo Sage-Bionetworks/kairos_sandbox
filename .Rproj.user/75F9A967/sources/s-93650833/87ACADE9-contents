@@ -1,0 +1,37 @@
+---
+title: "Robert Allaway"
+education:
+  courses:
+  - course: ''
+    institution: Sage Bionetworks
+    year: Sys.date()
+email: ''
+interests: null
+organizations:
+- name: Sage Bionetworks
+  url: https://www.sagebionetworks.org/
+role: Senior Scientist
+social:
+- icon: envelope
+  icon_pack: fas
+  link: /#contact
+- icon: twitter
+  icon_pack: fab
+  link: https://twitter.com/allawayr
+- icon: graduation-cap
+  icon_pack: fas
+  link: https://scholar.google.co.uk/citations?user=sIwtMXoAAAAJ
+- icon: github
+  icon_pack: fab
+  link: https://github.com/allaway
+- icon: linkedin
+  icon_pack: fab
+  link: https://www.linkedin.com/
+superuser: yes
+bio: ''
+user_groups: Principal Investigators
+---
+
+
+
+{{< icon name="download" pack="fas" >}} Download my {{< staticref "media/demo_resume.pdf" "newtab" >}}resumé{{< /staticref >}}.
